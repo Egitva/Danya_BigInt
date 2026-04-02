@@ -11,13 +11,14 @@ using namespace std;
 class BigInt {
     //строка в которой хранятся циферки
     string digits;
+private:
+    void normalize();
 public:
-
     //конструкторы с их перегрузками:
     BigInt(unsigned long long n = 0);
-    BigInt(string&);
+    BigInt(const string&);
     BigInt(const char*);
-    BigInt(BigInt&);
+    BigInt(const BigInt&);
 
     //функции помошники:
     friend void divide_by_2(BigInt& a);
@@ -63,10 +64,10 @@ public:
 
     //Возведение в степень
     friend BigInt& operator^=(BigInt&, const BigInt&);
-    friend BigInt operator^(BigInt&, const BigInt&);
+    friend BigInt operator^(const BigInt&, const BigInt&);
 
     //взятие корня
-    friend BigInt sqrt(BigInt& a);
+    friend BigInt sqrt(const BigInt& a);
 
     //Ввод и вывод
     friend ostream& operator<<(ostream&, const BigInt&);
@@ -78,493 +79,473 @@ public:
     friend BigInt Factorial(int n);
 
     //преобразование к типу стринг
-    operator string() const { return digits; }
+    operator string() const;
     //преобразование к типу инт
-    operator int() const {
-        try {
-            return *this <= (BigInt)2147483647 ? stoi(digits) : (int)2147483647;
-        }
-        catch (std::invalid_argument&) {
-            throw("ERORR invalid argument");
-            // Handle error here
-            // You might want to throw your own exception or return a default value
-        }
-    }
+    operator int() const;
 };
-//конструктор для инициализации с помощью строки string
-BigInt::BigInt(string& s) {
-    //инициализируем строку digits пустой строкой
-    digits = "";
-    //объявляем и инициализируем переменную n длинной полученной строки
-    int n = s.size();
-    //обратный цикл (идём от конца строки до её начала)
-    for (int i = n - 1; i >= 0; i--) {
-        //если символ не является цифрой выводим ошибку с текстом ERROR
-        if (!isdigit(s[i]))
-            throw("ERROR");
-        //добавляем в конец строки digits текущий символ переводя его в тип int
-        digits.push_back(s[i] - '0');
+// --------------------- Вспомогательная функция для base conversion ---------------------
+int get_small_value(const BigInt& num) {
+    if (Null(num)) return 0;
+    if (num.digits.size() > 2) {
+        throw std::runtime_error("Digit value too large for base conversion");
     }
+    int val = 0;
+    int p = 1;
+    for (char d : num.digits) {
+        val += static_cast<int>(d) * p;
+        p *= 10;
+    }
+    return val;
 }
-//конструктор для инициализации с помощью неотрицательного long long числа
+
+// --------------------- normalize ---------------------
+void BigInt::normalize() {
+    while (digits.size() > 1 && digits.back() == 0)
+        digits.pop_back();
+}
+
+// --------------------- Конструкторы ---------------------
 BigInt::BigInt(unsigned long long nr) {
-    //пока число есть и больше 0
+    digits.clear();
     do {
-        //добавляем в конец строки digits последний разряд(правый) переданного числа
         digits.push_back(nr % 10);
-        //делим переданное число на 10, чтобы избавиться от последнего(правого) разряда
         nr /= 10;
     } while (nr);
+    // normalize не требуется — нет ведущих нулей
 }
-//конструктор для инициализации с помощью строки в виде массива char'ов
-BigInt::BigInt(const char* s) {
-    //инициализируем строку digits пустой строкой
+
+BigInt::BigInt(const string& s) {
     digits = "";
-    //обратный цикл (идём от конца строки до её начала)
-    for (int i = strlen(s) - 1; i >= 0; i--)
-    {
-        //если символ не является цифрой выводим ошибку с текстом ERROR
-        if (!isdigit(s[i]))
-            throw("ERROR");
-        //добавляем в конец строки digits текущий символ переводя его в тип int
+    int n = s.size();
+    for (int i = n - 1; i >= 0; i--) {
+        if (!isdigit(static_cast<unsigned char>(s[i])))
+            throw std::invalid_argument("ERROR");
         digits.push_back(s[i] - '0');
     }
+    normalize();
 }
-//конструктор для инициализации с помощью другого класса BigInt
-BigInt::BigInt(BigInt& a) {
-    //присваиваем текущему классу в поле digits данные из поля digits переданного класса
+
+BigInt::BigInt(const char* s) {
+    digits = "";
+    int len = strlen(s);
+    for (int i = len - 1; i >= 0; i--) {
+        if (!isdigit(static_cast<unsigned char>(s[i])))
+            throw std::invalid_argument("ERROR");
+        digits.push_back(s[i] - '0');
+    }
+    normalize();
+}
+
+BigInt::BigInt(const BigInt& a) {
     digits = a.digits;
 }
-//метод для проверки является ли данное число в виде класса BigInt нулевым
+
+// --------------------- Вспомогательные функции ---------------------
 bool Null(const BigInt& a) {
-    //если длина поля digits переданного класса равно 1 и первый символ равен нулю
-    if (a.digits.size() == 1 && a.digits[0] == 0)
-        //возвращаем истину
-        return true;
-    //иначе возвращаем не истину :)
-    return false;
+    return (a.digits.size() == 1 && a.digits[0] == 0);
 }
-//метод для получения длины числа в виде класса BigInt
+
 int Length(const BigInt& a) {
-    //возвращаем длинну поля digits
     return a.digits.size();
 }
-//оператор для получения значения числа в виде клсса BigNum на переданной позиции
+
 int BigInt::operator[](const int index)const {
-    //если длина поля digits меньше или равна переданой позиции или переданная позиция меньше нуля
-    if (digits.size() <= index || index < 0)
-        //выводим ошибку
-        throw("ERROR");
-    //иначе выводим значение элемента index из поля digits
+    if (digits.size() <= static_cast<size_t>(index) || index < 0)
+        throw std::out_of_range("ERROR");
     return digits[index];
 }
-//оператор сравнивания равно
+
+// --------------------- Сравнения ---------------------
 bool operator==(const BigInt& a, const BigInt& b) {
-    //возращаем булевый результат сравнения полей digits друх переданных классов BigNum
     return a.digits == b.digits;
 }
-//оператор сравнивания не равно
+
 bool operator!=(const BigInt& a, const BigInt& b) {
-    //возвращаем булевый результат отрицания от операции сравнивания равно
     return !(a == b);
 }
-//оператор сравнения меньше
+
 bool operator<(const BigInt& a, const BigInt& b) {
-    //присваиваем переменным n и m длины переданных классов BigInt соответственно
     int n = Length(a), m = Length(b);
-    //если длина n не равна дине m
     if (n != m)
-        //возвращаем булевый результат оператора сравнения меньше между n и m
         return n < m;
-    //пока длинна левого числа n не меньше или равна 0
-    while (n--)
-        //проверяем с конца если элементы в классах BigNum отличаются то
+    while (n--) {
         if (a.digits[n] != b.digits[n])
-            //выводим булевый результат сравнения оператором меньше этих элементов
             return a.digits[n] < b.digits[n];
-    //иначе возвращаем не истину ;)
+    }
     return false;
 }
-//оператор сравнения больше
+
 bool operator>(const BigInt& a, const BigInt& b) {
-    //возвращаем булевый результат сравнения оператором меньше перевёрнутых входных классов BigNum
     return b < a;
 }
-//оператор сравнения больше или равно
+
 bool operator>=(const BigInt& a, const BigInt& b) {
-    //возвращаем булевый результат отрицания от вызова оператора сравнения меньше для входных классов BigNum a и b соответственно
-    //return !(a < b);
-    return a < b || a == b;
+    return !(a < b);
 }
-//оператор сравнения меньше или равно
+
 bool operator<=(const BigInt& a, const BigInt& b) {
-    //возвращаем булевый результат отрицания от вызова оператора сравнения больше для входных классов BigNum a и b соответственно
-    //return !(a > b);
     return a < b || a == b;
 }
-//оператор присваивания
+
+// --------------------- Присваивание ---------------------
 BigInt& BigInt::operator=(const BigInt& a) {
-    //присваиваем полю digits данного класса значение поля digits передаваемого класса BigNum
     digits = a.digits;
-    //возвращаем ссылку на данный класс
+    normalize();
     return *this;
 }
-//оператор преинкремента
+
+// --------------------- Инкремент/декремент ---------------------
 BigInt& BigInt::operator++() {
-    //объявляем переменную i и переменную n в которую записываем длину поля digits данного класса
     int i, n = digits.size();
-    //цикл от нуля пока i меньше длинны n и значение ячейки под ключом i равно 9 
     for (i = 0; i < n && digits[i] == 9; i++)
-        //присваиваем значение 0 в поле digits под ключом i данного класса 
         digits[i] = 0;
-    //если ключ i равен длине n 
     if (i == n)
-        //записываем в конец поля digits единичку
         digits.push_back(1);
-    //иначе
     else
-        //прибавляем единичку к полю digits под ключом i 
         digits[i]++;
-    //возвращаем ссылку на данный класс
+    normalize();
     return *this;
 }
-//оператор постинкремента
+
 BigInt BigInt::operator++(int temp) {
-    //объявляем экземпляр класса BigInt под именем aux
-    BigInt aux;
-    //инициализируем переменную aux копией данного класса
-    aux = *this;
-    //используем операцию преинкремента к ссылке на данный класс
+    BigInt aux = *this;
     ++(*this);
-    //возвращаем экземпляр класса aux 
     return aux;
 }
-//операция предикримента
+
 BigInt& BigInt::operator--() {
-    //проверяем ессли первый элемент в поле digits данного класса равен 0 и длинна поля digits данного класса равна 1
     if (digits[0] == 0 && digits.size() == 1)
-        //выводим ошибку
-        throw("UNDERFLOW");
-    //объявляем переменную i и n инициализируем переменную n длинной поля digits данного класса
+        throw std::underflow_error("UNDERFLOW");
     int i, n = digits.size();
-    //цикл от нуля пока значение эчейки поля digits под ключом i равно 0 и i меньше длинны поля digits
     for (i = 0; digits[i] == 0 && i < n; i++)
-        //присваиваем 9 в ячейку поля digits под ключом i
         digits[i] = 9;
-    //вычитаем единицу из ячейки поля digits под ключом i 
     digits[i]--;
-    //проверяем если длинна больше 1 и левое значение от данноой ячейки равно 0
-    if (n > 1 && digits[n - 1] == 0)
-        //удаляем последний(правый) элемент поля digits данного класса
+    while (n > 1 && digits[n - 1] == 0) {
         digits.pop_back();
-    //возвращаем ссылку на данный класс
+        n--;
+    }
+    normalize();
     return *this;
 }
-//оператор постдекремента
+
 BigInt BigInt::operator--(int temp) {
-    //объявляем экземпляр класса BigInt под именем aux
-    BigInt aux;
-    //инициализируем переменную aux копией данного класса
-    aux = *this;
-    //используем операцию предекремента к ссылке на данный класс
+    BigInt aux = *this;
     --(*this);
-    //возвращаем экземпляр класса aux 
     return aux;
 }
-//оператор сложения с присвоением 
+
+// --------------------- Сложение/вычитание ---------------------
 BigInt& operator+=(BigInt& a, const BigInt& b) {
-    //объявляем переменную t и инициализируем её нулём, а так же объявляем переменные s и i
     int t = 0, s, i;
-    //объявляем переменные n и m и инициализируем их длинной полей digits переданных классов BigNum a и b соответственно
     int n = Length(a), m = Length(b);
-    //если длинна m больше длинны n
     if (m > n)
-        //добавляем классу a в поле digits на позицию m - n значение равное 0
         a.digits.append(m - n, 0);
-    //присваиваем к n длинну переданного класса a 
     n = Length(a);
-    //цикд от нуля пока i меньше длинны n
     for (i = 0; i < n; i++) {
-        //проверяем если счётчик i меньше длинны m
         if (i < m)
-            //записываем в переменную s результат сложения полей digits под ключом i классов a и b соответственно вместе с долгом от прдыдущей операции сложения
-            s = (a.digits[i] + b.digits[i]) + t;
-        //иначе
+            s = a.digits[i] + b.digits[i] + t;
         else
-            //записываем в переменную s результат сложения поля digits под ключом i класса a вместе с долгом от прдыдущей операции сложения
             s = a.digits[i] + t;
-        //записываем в переменную долга значение переменной s без последнего(правого) разряда
         t = s / 10;
-        //присваиваем полю digits класса a остаток от деления на 10 переменной s
-        a.digits[i] = (s % 10);
+        a.digits[i] = s % 10;
     }
-    //если долг существует
     if (t)
-        //записываем в конец поля digits класса а этот долг
         a.digits.push_back(t);
-    //возвращаем класс a
+    a.normalize();
     return a;
 }
-//оператор прибавления 
+
 BigInt operator+(const BigInt& a, const BigInt& b) {
-    //создаём экземпляр класса BigInt c именем temp
-    BigInt temp;
-    //присваиваем к переменной temp переданный класс a 
-    temp = a;
-    //прибавляем с присвоением переданный класс b к переменной temp
+    BigInt temp = a;
     temp += b;
-    //возвращаем экземпляр класса temp
     return temp;
 }
-//оператор вычитания с присвоением
+
 BigInt& operator-=(BigInt& a, const BigInt& b) {
-    //проверяем если переданный класс a меньше переданного класса b
     if (a < b)
-        //выводим ошибку
-        throw("UNDERFLOW");
-    //объявляем переменные n и m и инициализируем их длинной полей digits переданных классов BigNum a и b соответственно
+        throw std::underflow_error("UNDERFLOW");
     int n = Length(a), m = Length(b);
-    //объявляем переменную t и инициализируем её нулём, а так же объявляем переменные s и i
     int i, t = 0, s;
-    //цикл от нуля пока i меньше длинны n
     for (i = 0; i < n; i++) {
-        //проверяем если i меньше длинны m
         if (i < m)
-            //присваиваем в переменную s результат вычитания между полями digits классов а и b соответственно совместно с суммированием долг предидущей операции вычитания
             s = a.digits[i] - b.digits[i] + t;
-        //иначе
         else
-            //записываем в переменную s результат сложения поля digits под ключом i класса a вместе с долгом от прдыдущей операции сложения
             s = a.digits[i] + t;
-        //если переменная s меньше чем 0
-        if (s < 0)
-            //прибавляем к переменной s 10
-            s += 10,
-            //и присваиваемпеременной долга минус один
+        if (s < 0) {
+            s += 10;
             t = -1;
-        //иначе
+        }
         else
-            //присваиваем переменной долга 0
             t = 0;
-        //присваиваем полю digits класса a значение переменной s
         a.digits[i] = s;
     }
-    //цикл пока длинна n больше 1 и поле digits слева от текущего равно 0 
-    while (n > 1 && a.digits[n - 1] == 0)
-        //удаляем последний(правый) элемент поля digits класса a
-        a.digits.pop_back(),
-        //вычитаем единичку из n
+    while (n > 1 && a.digits[n - 1] == 0) {
+        a.digits.pop_back();
         n--;
-    //позвращаем класс a
+    }
+    a.normalize();
     return a;
 }
-//оператор минус
+
 BigInt operator-(const BigInt& a, const BigInt& b) {
-    //создаём экземпляр класса BigInt c именем temp
-    BigInt temp;
-    //присваиваем к переменной temp переданный класс a 
-    temp = a;
-    //вычитаем с присвоением переданный класс b к переменной temp
+    BigInt temp = a;
     temp -= b;
-    //возвращаем экземпляр класса temp
     return temp;
 }
-//оператор умножения с присвоением
-BigInt& operator*=(BigInt& a, const BigInt& b)
-{
-    //проверяем если переданные классы а или b нулевые 
+
+// --------------------- Умножение ---------------------
+BigInt& operator*=(BigInt& a, const BigInt& b) {
     if (Null(a) || Null(b)) {
-        //присваиваем классу a нулевой класс BigInt
         a = BigInt();
-        //возвращаем класс а
         return a;
     }
-    //объявляем переменные n и m и инициализируем их длинами полей digits передаваемых классов соответственно
     int n = a.digits.size(), m = b.digits.size();
-    //создаём векторный массив с типом int размером в сумму длин передаваемых классов и заполняем его нулями
     vector<int> v(n + m, 0);
-    //цикл от нуля пока i меньше n
     for (int i = 0; i < n; i++)
-        //цикл от нуля у цикле от нуля (тут типа смешно) пока j меньше m
         for (int j = 0; j < m; j++) {
-            //суммируем с присвоением в ячейку под ключом равным сумме i и j результат умножения полей digits классов а и b с ключами i и j соответственно
-            v[i + j] += (a.digits[i]) * (b.digits[j]);
+            v[i + j] += a.digits[i] * b.digits[j];
         }
-    //прибавляем с присвоением m к n
     n += m;
-    //изменяем размер поля digits класса а соответственно размеру массива v
     a.digits.resize(v.size());
-    //цикл с ключами s, i=0, t=0 пока i меньше n 
-    for (int s, i = 0, t = 0; i < n; i++)
-    {
-        //присваиваем в переменную s результат сложения t и значения ячейки v под ключом i 
+    for (int s, i = 0, t = 0; i < n; i++) {
         s = t + v[i];
-        //в значение ячейки v под ключом i присаиваем остаток от деления на 10 переменной s
         v[i] = s % 10;
-        //в переменною t присваиваем перменную s без последнего(правого) разряда
         t = s / 10;
-        //присваиваем к полю digits класса а под ключом i значение ячейки v под ключом i
         a.digits[i] = v[i];
     }
-    //обратный цикл от длины n пока i больше или равно 1 и отрицание v под ключом i
     for (int i = n - 1; i >= 1 && !v[i]; i--)
-        //удаляем последний(правый) элемент поля digits класса а
         a.digits.pop_back();
-    //возвращаем класс а
+    a.normalize();
     return a;
 }
-//оператор умножения
+
 BigInt operator*(const BigInt& a, const BigInt& b) {
-    //создаём экземпляр класса BigInt c именем temp
-    BigInt temp;
-    //присваиваем к переменной temp переданный класс a 
-    temp = a;
-    //умножеем с присвоением переданный класс b к переменной temp
+    BigInt temp = a;
     temp *= b;
-    //возвращаем экземпляр класса temp
     return temp;
 }
-//оператор деление с присвоением
+
+// --------------------- Деление ---------------------
 BigInt& operator/=(BigInt& a, const BigInt& b) {
-    //если б это ноль 
     if (Null(b))
-        //на ноль делить нельзя
-        throw("Arithmetic Error: Division By 0");
-    //проверяем если а меньше б 
+        throw std::invalid_argument("Arithmetic Error: Division By 0");
     if (a < b) {
         a = BigInt();
-        //возвращаем занулённое а
         return a;
     }
-    //если а равно б
     if (a == b) {
         a = BigInt(1);
-        //возвращаем один
         return a;
     }
     int i, lgcat = 0, cc;
-    //присваиваем длины переменным м и н 
     int n = Length(a), m = Length(b);
-    //делаем вектор интовский длинны н заполненный нулями
     vector<int> cat(n, 0);
-    //делаем экземпляр класса под именем т
     BigInt t;
-    //цикл от конца пока т * 10 + значение элемента digits под ключом i меньше б
     for (i = n - 1; t * (BigInt)10 + (BigInt)a.digits[i] < b; i--) {
-        //умножаем т на 10
         t *= 10;
-        //прибавляем с присвоением к т значение элемента digits под ключом i
         t += a.digits[i];
     }
-    //цикл вниз пока i больше или равно 0
     for (; i >= 0; i--) {
-        //присваиваем к т т * 10 + значение элемента digits под ключом i 
         t = t * (BigInt)10 + (BigInt)a.digits[i];
-        //пробегаем фрорм вниз от 9 пока сс * б больше т 
         for (cc = 9; (BigInt)cc * b > t; cc--);
-        //вычитаем из т сс * б
         t -= (BigInt)cc * b;
-        //к ячейке кат под ключом lgcat++ прибавляем сс
         cat[lgcat++] = cc;
     }
-    //расширяем поле digits соотвественно с кат 
     a.digits.resize(cat.size());
-    //цикл пока i меньше lgcat
     for (i = 0; i < lgcat; i++)
-        //присваиваем значения из кат в digits
         a.digits[i] = cat[lgcat - i - 1];
-    //расширяем digits под lgcat
     a.digits.resize(lgcat);
-    //возвращаем а
+    a.normalize();
     return a;
 }
-//оператор деления
+
 BigInt operator/(const BigInt& a, const BigInt& b) {
-    //создаём экземпляр класса BigInt c именем temp
-    BigInt temp;
-    //присваиваем к переменной temp переданный класс a 
-    temp = a;
-    //делим с присвоением переданный класс b к переменной temp
+    BigInt temp = a;
     temp /= b;
-    //возвращаем экземпляр класса temp
     return temp;
 }
-//оператор остатка от деления с присвоением
+
+// --------------------- Остаток ---------------------
 BigInt& operator%=(BigInt& a, const BigInt& b) {
-    //если б это нуль
     if (Null(b))
-        //отправляем ошибку
-        throw("Arithmetic Error: Division By 0");
-    //если а меньше б
+        throw std::invalid_argument("Arithmetic Error: Division By 0");
     if (a < b) {
-        //отправляем а
         return a;
     }
-    //если а равно б
     if (a == b) {
         a = BigInt();
-        //отправляем занулённое а
         return a;
     }
     int i, lgcat = 0, cc;
-    //присваиваем длины переменным м и н 
     int n = Length(a), m = Length(b);
-    //делаем вектор интовский длинны н заполненный нулями
     vector<int> cat(n, 0);
-    //делаем экземпляр класса под именем т
     BigInt t;
-    //цикл от конца пока т * 10 + значение элемента digits под ключом i меньше б
     for (i = n - 1; t * (BigInt)10 + (BigInt)a.digits[i] < b; i--) {
-        //умножаем т на 10
         t *= 10;
-        //прибавляем с присвоением к т значение элемента digits под ключом i
         t += a.digits[i];
     }
-    //цикл вниз пока i больше или равно 0
     for (; i >= 0; i--) {
-        //присваиваем к т т * 10 + значение элемента digits под ключом i 
         t = t * (BigInt)10 + (BigInt)a.digits[i];
-        //пробегаем фрорм вниз от 9 пока сс * б больше т 
         for (cc = 9; (BigInt)cc * b > t; cc--);
-        //вычитаем из т сс * б
         t -= (BigInt)cc * b;
-        //к ячейке кат под ключом lgcat++ прибавляем сс
         cat[lgcat++] = cc;
     }
-    //приравниваем а к т
     a = t;
-    //возвращаем а
+    a.normalize();
     return a;
 }
-//оператор остатка от деления
+
 BigInt operator%(const BigInt& a, const BigInt& b) {
-    //создаём экземпляр класса BigInt c именем temp
-    BigInt temp;
-    //присваиваем к переменной temp переданный класс a 
-    temp = a;
-    //вычисляем остаток от деления с присвоением переданный класс b к переменной temp
+    BigInt temp = a;
     temp %= b;
-    //возвращаем экземпляр класса temp
     return temp;
 }
-//оператор возведения в степень с присвоением
+
+// --------------------- Возведение в степень ---------------------
 BigInt& operator^=(BigInt& a, const BigInt& b) {
-    BigInt Exponent, Base(a);
-    Exponent = b;
-    a = 1;
+    BigInt Exponent = b;
+    BigInt Base = a;
+    a = BigInt(1);
     while (!Null(Exponent)) {
         if (Exponent[0] & 1)
             a *= Base;
         Base *= Base;
         divide_by_2(Exponent);
     }
+    a.normalize();
     return a;
 }
-//оператор возведения в степень
-BigInt operator^(BigInt& a, BigInt& b) {
-    BigInt temp(a);
+
+BigInt operator^(const BigInt& a, const BigInt& b) {
+    BigInt temp = a;
     temp ^= b;
     return temp;
+}
+
+// --------------------- divide_by_2 ---------------------
+void divide_by_2(BigInt& a) {
+    int add = 0;
+    for (int i = a.digits.size() - 1; i >= 0; i--) {
+        int digit = (a.digits[i] >> 1) + add;
+        add = ((a.digits[i] & 1) * 5);
+        a.digits[i] = digit;
+    }
+    while (a.digits.size() > 1 && !a.digits.back())
+        a.digits.pop_back();
+    a.normalize();
+}
+
+// --------------------- sqrt ---------------------
+BigInt sqrt(const BigInt& a) {
+    if (Null(a)) return BigInt(0);
+    BigInt left(1), right(a), v(1), mid, prod;
+    divide_by_2(right);
+    while (left <= right) {
+        mid = BigInt();
+        mid += left;
+        mid += right;
+        divide_by_2(mid);
+        prod = (mid * mid);
+        if (prod <= a) {
+            v = mid;
+            ++mid;
+            left = mid;
+        }
+        else {
+            --mid;
+            right = mid;
+        }
+        mid = BigInt();
+    }
+    return v;
+}
+
+// --------------------- Математические функции ---------------------
+BigInt NthCatalan(int n) {
+    BigInt a(1), b;
+    for (int i = 2; i <= n; i++)
+        a *= i;
+    b = a;
+    for (int i = n + 1; i <= 2 * n; i++)
+        b *= i;
+    a *= a;
+    a *= (n + 1);
+    b /= a;
+    return b;
+}
+
+BigInt NthFibonacci(int n) {
+    BigInt a(1), b(1), c;
+    if (!n)
+        return c;
+    n--;
+    while (n--) {
+        c = a + b;
+        b = a;
+        a = c;
+    }
+    return b;
+}
+
+BigInt Factorial(int n) {
+    BigInt f(1);
+    for (int i = 2; i <= n; i++)
+        f *= i;
+    return f;
+}
+
+// --------------------- Ввод/вывод ---------------------
+istream& operator>>(istream& in, BigInt& a) {
+    string s;
+    in >> s;
+    if (s.empty()) {
+        a = BigInt(0);
+        return in;
+    }
+    for (char c : s) {
+        if (!isdigit(static_cast<unsigned char>(c)))
+            throw std::invalid_argument("INVALID NUMBER");
+    }
+    a.digits.clear();
+    for (int i = static_cast<int>(s.size()) - 1; i >= 0; i--) {
+        a.digits.push_back(s[i] - '0');
+    }
+    a.normalize();
+    return in;
+}
+
+ostream& operator<<(ostream& out, const BigInt& a) {
+    if (Null(a)) {
+        out << 0;
+        return out;
+    }
+    for (int i = static_cast<int>(a.digits.size()) - 1; i >= 0; i--)
+        out << static_cast<char>('0' + a.digits[i]);
+    return out;
+}
+
+// --------------------- Преобразования ---------------------
+BigInt::operator string() const {
+    if (Null(*this)) return "0";
+    string res;
+    res.reserve(digits.size());
+    for (int i = static_cast<int>(digits.size()) - 1; i >= 0; i--)
+        res += '0' + digits[i];
+    return res;
+}
+
+BigInt::operator int() const {
+    if (digits.size() > 10)
+        return 2147483647;
+    long long val = 0;
+    long long p = 1;
+    for (char d : digits) {
+        val += static_cast<long long>(d) * p;
+        p *= 10;
+    }
+    if (val > 2147483647LL)
+        return 2147483647;
+    return static_cast<int>(val);
 }
 //метод для проверки делится ли на 2
 void divide_by_2(BigInt& a) {
