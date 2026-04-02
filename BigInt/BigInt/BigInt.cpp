@@ -547,196 +547,36 @@ BigInt::operator int() const {
         return 2147483647;
     return static_cast<int>(val);
 }
-//метод для проверки делится ли на 2
-void divide_by_2(BigInt& a) {
-    int add = 0;
-    for (int i = a.digits.size() - 1; i >= 0; i--) {
-        int digit = (a.digits[i] >> 1) + add;
-        add = ((a.digits[i] & 1) * 5);
-        a.digits[i] = digit;
-    }
-    while (a.digits.size() > 1 && !a.digits.back())
-        a.digits.pop_back();
-}
-//метод взятия корня
-BigInt sqrt(BigInt& a) {
-    BigInt left(1), right(a), v(1), mid, prod;
-    divide_by_2(right);
-    while (left <= right) {
-        mid += left;
-        mid += right;
-        divide_by_2(mid);
-        prod = (mid * mid);
-        if (prod <= a) {
-            v = mid;
-            ++mid;
-            left = mid;
-        }
-        else {
-            --mid;
-            right = mid;
-        }
-        mid = BigInt();
-    }
-    return v;
-}
-//метод опеределения катлан
-BigInt NthCatalan(int n) {
-    BigInt a(1), b;
-    for (int i = 2; i <= n; i++)
-        a *= i;
-    b = a;
-    for (int i = n + 1; i <= 2 * n; i++)
-        b *= i;
-    a *= a;
-    a *= (n + 1);
-    b /= a;
-    return b;
-}
-//метод определения фибоначи
-BigInt NthFibonacci(int n) {
-    BigInt a(1), b(1), c;
-    if (!n)
-        return c;
-    n--;
-    while (n--) {
-        c = a + b;
-        b = a;
-        a = c;
-    }
-    return b;
-}
-//метод определения факториала
-BigInt Factorial(int n) {
-    BigInt f(1);
-    for (int i = 2; i <= n; i++)
-        f *= i;
-    return f;
-}
-//оператор ввода
-istream& operator>>(istream& in, BigInt& a) {
-    //строка буфер для входа
-    string s;
-    //получение данных из стрима
-    in >> s;
-    //присвение к н длинны строки
-    int n = s.size();
-    //пробегаемся по строке с кона
-    for (int i = n - 1; i >= 0; i--) {
-        //проверяем если это не цифра
-        if (!isdigit(s[i]))
-            //выдаём ошибку
-            throw("INVALID NUMBER");
-        //иначе записываем в поле digits символ из строки
-        a.digits[n - i - 1] = s[i];
-    }
-    //возвращаем стрим
-    return in;
-}
-//оператор вывода
-ostream& operator<<(ostream& out, const BigInt& a) {
-    //пробегаемся по digits от конца
-    for (int i = a.digits.size() - 1; i >= 0; i--)
-        //выводим на экран превратив в short
-        cout << (short)a.digits[i];
-    //возвращаем cout
-    return cout;
-}
-//это чудо нужно для того чтобы присваивать BigNum к int в допустимых значениях
-int kakoeEtoInt(BigInt x) {
-    //провер.... эээ ты что подумал я это буду коментировать? хехехе, ну ты смешной... сам поймёшь
-    if (x == (BigInt)"0") {
-        return 0;
-    }
-    if (x == (BigInt)1) {
-        return 1;
-    }
-    if (x == (BigInt)2) {
-        return 2;
-    }
-    if (x == (BigInt)3) {
-        return 3;
-    }
-    if (x == (BigInt)4) {
-        return 4;
-    }
-    if (x == (BigInt)5) {
-        return 5;
-    }
-    if (x == (BigInt)6) {
-        return 6;
-    }
-    if (x == (BigInt)7) {
-        return 7;
-    }
-    if (x == (BigInt)8) {
-        return 8;
-    }
-    if (x == (BigInt)9) {
-        return 9;
-    }
-    if (x == (BigInt)10) {
-        return 10;
-    }
-    if (x == (BigInt)11) {
-        return 11;
-    }
-    if (x == (BigInt)12) {
-        return 12;
-    }
-    if (x == (BigInt)13) {
-        return 13;
-    }
-    if (x == (BigInt)14) {
-        return 14;
-    }
-    if (x == (BigInt)15) {
-        return 15;
-    }
-}
-//функция для перевода в систему счисления с базой системы счисления для 16
+// --------------------- ten_base (улучшенная, поддерживает 2–36) ---------------------
 string ten_base(BigInt x, int base) {
-    //массив char'ов с элементами системы счисления
-    char digits[] = { '0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F' };
-    //проверка если база равна длинне массива с элементами системы счисления возвращаем изначальное число в виде строки
-    if (base > (sizeof(digits) / sizeof(digits[0]))) return (string)x;
-    //объявляем переменную res где будет жить и процветать результат рабоы нашей функции
+    if (base < 2 || base > 36)
+        throw std::invalid_argument("Base must be between 2 and 36");
+    if (Null(x)) return "0";
+
+    const char* digits_str = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     string res;
-    //цикл пока ПеЛьменнаЯ х больше нуля 
-    while (x > (BigInt)"0")
-    {
-        //создаём экземпляр класса BigInt под названием тэмп и присваиваем туда копию числа х >( 
-        BigInt tmp(x);
-        //в переменную темп присваиваем остаток от деления на базу
-        tmp %= base;
-        //в переменную res присваиваем сумму элемента массива с элементами системы счисления под ключом тэмп и переменной res
-        res = digits[kakoeEtoInt(tmp)] + res;
-        //делим переменную х на базу
-        x /= base;
+    while (!Null(x)) {
+        BigInt tmp = x % BigInt(static_cast<unsigned long long>(base));
+        int dval = get_small_value(tmp);
+        res = digits_str[dval] + res;
+        x /= BigInt(static_cast<unsigned long long>(base));
     }
-    //возвращаем гений выполнения нашей функции
     return res;
 }
-//ну это мэйн, я в целом так, для красоты добавил
-int main()
-{
-    //ставим русский в консоль
+
+// --------------------- main ---------------------
+int main() {
     setlocale(LC_ALL, "Russian");
-    //делаем переменную для ввода бим бим
     string input;
-    //вводим бам бам
     cin >> input;
-    //проверяем что во вводе только циферки
     if (input.find_first_not_of("0123456789") == std::string::npos) {
-        //создаём экземпляр класса BigNum со значением введённых циферок
         BigInt a(input);
-        //демонстрируем пользователю гений компьютерной мысли просчитанный лучшим алгоритмом человечества находящимся в функции ten_base
         cout << ten_base(a, 16);
     }
     else {
-        //ну а тут у нас в общем для тех кто глупый записочка O:)
-        cerr << "Не пойми неправильно, но это программа не пускает \"всяких\" людишек, которые пытаются пронести буквы ссобой, не надо так, дядя!";
+        cerr << "Не пойми неправильно, но это программа не пускает \"всяких\" людишек, которые пытаются пронести буквы с собой, не надо так, дядя!";
     }
+    return 0;
 }
 
 // Запуск программы: CTRL+F5 или меню "Отладка" > "Запуск без отладки"
